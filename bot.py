@@ -14,51 +14,68 @@ TEMPLATE_PATH = Path("template.png")
 FONT_PATH = Path("SBSansDisplay-Regular.ttf")
 
 COLOR_DARK = (58, 68, 79, 255)
-COLOR_POSITIVE = (124, 195, 42, 255)
-COLOR_NEGATIVE = (79, 192, 242, 255)
+COLOR_GREEN = (141, 194, 44, 255)
+COLOR_BLUE = (79, 192, 242, 255)
 
-FONT_DATE_SIZE = 32
-FONT_VALUE_SIZE = 36
-FONT_CHANGE_SIZE = 36
+FONT_DATE_SIZE = 29
+FONT_VALUE_SIZE = 33
+FONT_CHANGE_SIZE = 33
 
 COORDS = {
-    "date": (1115, 53),
+    "date": (1106, 49),
 
-    "imoex_value": (286, 239),
-    "imoex_change": (286, 341),
+    "imoex_value": (341, 225),
+    "imoex_change": (332, 320),
 
-    "rts_value": (518, 239),
-    "rts_change": (518, 341),
+    "rts_value": (560, 225),
+    "rts_change": (557, 320),
 
-    "brent_value": (739, 239),
-    "brent_change": (739, 341),
+    "brent_value": (772, 225),
+    "brent_change": (746, 320),
 
-    "gold_value": (966, 239),
-    "gold_change": (966, 341),
+    "gold_value": (994, 225),
+    "gold_change": (978, 320),
 
-    "cny_value": (286, 610),
-    "cny_change": (286, 712),
+    "cny_value": (329, 585),
+    "cny_change": (334, 680),
 
-    "usd_value": (518, 610),
-    "usd_change": (518, 712),
+    "usd_value": (558, 585),
+    "usd_change": (555, 680),
 
-    "eur_value": (739, 610),
-    "eur_change": (739, 712),
+    "eur_value": (767, 585),
+    "eur_change": (766, 680),
 
-    "aed_value": (966, 610),
-    "aed_change": (966, 712),
+    "aed_value": (986, 585),
+    "aed_change": (987, 680),
 
-    "bond2_value": (286, 984),
-    "bond2_change": (286, 1088),
+    "bond2_value": (332, 945),
+    "bond2_change": (332, 1041),
 
-    "bond5_value": (518, 984),
-    "bond5_change": (518, 1088),
+    "bond5_value": (556, 945),
+    "bond5_change": (577, 1041),
 
-    "bond10_value": (739, 984),
-    "bond10_change": (739, 1088),
+    "bond10_value": (768, 945),
+    "bond10_change": (789, 1041),
 
-    "bond20_value": (966, 984),
-    "bond20_change": (966, 1088),
+    "bond20_value": (988, 945),
+    "bond20_change": (1014, 1041),
+}
+
+CHANGE_COLORS = {
+    "imoex_change": COLOR_BLUE,
+    "rts_change": COLOR_GREEN,
+    "brent_change": COLOR_GREEN,
+    "gold_change": COLOR_BLUE,
+
+    "cny_change": COLOR_BLUE,
+    "usd_change": COLOR_BLUE,
+    "eur_change": COLOR_BLUE,
+    "aed_change": COLOR_BLUE,
+
+    "bond2_change": COLOR_DARK,
+    "bond5_change": COLOR_DARK,
+    "bond10_change": COLOR_DARK,
+    "bond20_change": COLOR_DARK,
 }
 
 
@@ -66,22 +83,26 @@ def read_excel(xlsx_path: str) -> Dict[str, str]:
     wb = load_workbook(xlsx_path, data_only=True)
     ws = wb.active
 
-    data = {}
+    data: Dict[str, str] = {}
     for row in ws.iter_rows(min_row=2, values_only=True):
-        if row[0]:
-            data[str(row[0])] = str(row[1]) if row[1] else ""
+        if not row:
+            continue
+        key = row[0]
+        value = row[1] if len(row) > 1 else ""
+        if key:
+            data[str(key).strip()] = "" if value is None else str(value).strip()
     return data
 
 
-def get_color(text: str):
-    if text.startswith("+"):
-        return COLOR_POSITIVE
-    if text.startswith("-"):
-        return COLOR_NEGATIVE
-    return COLOR_DARK
+def draw_center(draw: ImageDraw.ImageDraw, xy, text: str, font, fill) -> None:
+    bbox = draw.textbbox((0, 0), text, font=font)
+    w = bbox[2] - bbox[0]
+    x = int(xy[0] - w / 2)
+    y = int(xy[1])
+    draw.text((x, y), text, font=font, fill=fill)
 
 
-def render(template_path: Path, output_path: str, data: Dict[str, str]):
+def render(template_path: Path, output_path: str, data: Dict[str, str]) -> None:
     image = Image.open(template_path).convert("RGBA")
     draw = ImageDraw.Draw(image)
 
@@ -89,27 +110,39 @@ def render(template_path: Path, output_path: str, data: Dict[str, str]):
     font_value = ImageFont.truetype(str(FONT_PATH), FONT_VALUE_SIZE)
     font_change = ImageFont.truetype(str(FONT_PATH), FONT_CHANGE_SIZE)
 
-    draw.text(COORDS["date"], data.get("date", ""), font=font_date, fill=COLOR_DARK)
+    draw_center(draw, COORDS["date"], data.get("date", ""), font_date, COLOR_DARK)
 
-    for key in COORDS:
-        if "value" in key:
-            draw.text(COORDS[key], data.get(key, ""), font=font_value, fill=COLOR_DARK)
+    value_keys = [
+        "imoex_value", "rts_value", "brent_value", "gold_value",
+        "cny_value", "usd_value", "eur_value", "aed_value",
+        "bond2_value", "bond5_value", "bond10_value", "bond20_value",
+    ]
+    for key in value_keys:
+        draw_center(draw, COORDS[key], data.get(key, ""), font_value, COLOR_DARK)
 
-        if "change" in key:
-            val = data.get(key, "")
-            draw.text(COORDS[key], val, font=font_change, fill=get_color(val))
+    change_keys = [
+        "imoex_change", "rts_change", "brent_change", "gold_change",
+        "cny_change", "usd_change", "eur_change", "aed_change",
+        "bond2_change", "bond5_change", "bond10_change", "bond20_change",
+    ]
+    for key in change_keys:
+        draw_center(draw, COORDS[key], data.get(key, ""), font_change, CHANGE_COLORS[key])
 
     image.save(output_path)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Отправь Excel файл .xlsx")
+    if update.message:
+        await update.message.reply_text("Отправь Excel файл .xlsx")
 
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.document:
+        return
+
     doc = update.message.document
 
-    if not doc.file_name.endswith(".xlsx"):
+    if not doc.file_name or not doc.file_name.lower().endswith(".xlsx"):
         await update.message.reply_text("Нужен .xlsx файл")
         return
 
@@ -117,8 +150,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file_path = os.path.join(tmp, doc.file_name)
         result_path = os.path.join(tmp, "result.png")
 
-        file = await context.bot.get_file(doc.file_id)
-        await file.download_to_drive(file_path)
+        tg_file = await context.bot.get_file(doc.file_id)
+        await tg_file.download_to_drive(file_path)
 
         data = read_excel(file_path)
         render(TEMPLATE_PATH, result_path, data)
@@ -134,7 +167,15 @@ def main():
     if not FONT_PATH.exists():
         raise Exception(f"Нет шрифта {FONT_PATH}")
 
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .connect_timeout(30)
+        .read_timeout(30)
+        .write_timeout(30)
+        .pool_timeout(30)
+        .build()
+    )
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.Document.ALL, handle))
